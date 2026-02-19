@@ -31,6 +31,16 @@ export default function TestingPage() {
           </s-list-item>
         </s-unordered-list>
       </s-section>
+      <s-section heading="Testing menus">
+        <s-button icon="caret-down" commandFor="testing-menu">
+          Testing menu
+        </s-button>
+        <s-menu id="testing-menu">
+          <s-button>Menu item 1</s-button>
+          <s-button>Menu item 2</s-button>
+          <s-button>Menu item 3</s-button>
+        </s-menu>
+      </s-section>
     </s-page>
   );
 }
