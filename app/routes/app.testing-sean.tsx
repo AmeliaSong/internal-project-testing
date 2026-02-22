@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from "react";
 import { useLoaderData } from "react-router";
 
 import type { LoaderFunctionArgs } from "react-router";
@@ -29,6 +30,12 @@ type BlogNode = {
 
 type BlogEdge = {
   node: BlogNode;
+};
+
+type ImgInfo = {
+  src: string;
+  alt: string;
+  index: number;
 };
 
 export const loader = async ({
@@ -114,22 +121,16 @@ export default function TestingPageSean() {
 
             {articles.map((articleEdge: ArticleEdge) => {
               const article = articleEdge.node;
-              const missingAltCount = countImagesWithoutAlt(article.body);
 
               return (
                 <div key={article.id}>
                   <s-section heading={article.title}>
                     <h3>Summary</h3>
                     <p>{article.summary}</p>
-                    <h3>Info: </h3>
-                    <p>Images with no alt text: {missingAltCount}</p>
-                    <div
-                      dangerouslySetInnerHTML={{
-                        __html: article.body ?? "",
-                      }}
-                    />
+                    <h3>Images</h3>
+                    <ArticleImageAltEditor article={article} />
                   </s-section>
-                  <br></br>
+                  <br />
                 </div>
               );
             })}
@@ -137,5 +138,117 @@ export default function TestingPageSean() {
         );
       })}
     </s-page>
+  );
+}
+
+function extractImagesFromHtml(html?: string | null): ImgInfo[] {
+  if (!html) return [];
+  if (typeof DOMParser !== "undefined") {
+    try {
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const imgs = Array.from(doc.getElementsByTagName("img"));
+      return imgs.map((img, i) => ({
+        src: img.getAttribute("src") ?? "",
+        alt: img.getAttribute("alt") ?? "",
+        index: i,
+      }));
+    } catch {
+      // fall through to regex fallback
+    }
+  }
+
+  const tags = html.match(/<img\b[^>]*>/gi) || [];
+  return tags.map((tag, i) => {
+    const srcMatch = tag.match(/src\s*=\s*(['"])(.*?)\1/i);
+    const altMatch = tag.match(/alt\s*=\s*(['"])(.*?)\1/i);
+    return {
+      src: srcMatch ? srcMatch[2] : "",
+      alt: altMatch ? altMatch[2] : "",
+      index: i,
+    };
+  });
+}
+
+function ArticleImageAltEditor({ article }: { article: ArticleNode }) {
+  const [mounted, setMounted] = useState(false);
+  const [images, setImages] = useState<ImgInfo[]>([]);
+  const [modifiedHtml, setModifiedHtml] = useState(article.body ?? "");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    setImages(extractImagesFromHtml(modifiedHtml));
+  }, [mounted, modifiedHtml]);
+
+  function updateAltAt(index: number, newAlt: string) {
+    if (typeof DOMParser === "undefined") {
+      setImages((prev) => prev.map((img) => (img.index === index ? { ...img, alt: newAlt } : img)));
+      setModifiedHtml((prev) => {
+        const tags = prev.match(/<img\b[^>]*>/gi) || [];
+        const tag = tags[index];
+        if (!tag) return prev;
+        let newTag = tag;
+        if (/alt\s*=/.test(tag)) {
+          newTag = tag.replace(/alt\s*=\s*(['"])(.*?)\1/i, `alt="${newAlt}"`);
+        } else {
+          newTag = tag.replace(/<img\b/, `<img alt="${newAlt}"`);
+        }
+        return prev.replace(tag, newTag);
+      });
+      return;
+    }
+
+    const doc = new DOMParser().parseFromString(modifiedHtml, "text/html");
+    const imgs = Array.from(doc.getElementsByTagName("img"));
+    const target = imgs[index];
+    if (!target) return;
+    target.setAttribute("alt", newAlt);
+    setModifiedHtml(doc.body.innerHTML);
+    setImages(Array.from(doc.getElementsByTagName("img")).map((img, i) => ({
+      src: img.getAttribute("src") ?? "",
+      alt: img.getAttribute("alt") ?? "",
+      index: i,
+    })));
+  }
+
+  function updateAll() {
+    if (typeof DOMParser === "undefined") return;
+    const doc = new DOMParser().parseFromString(modifiedHtml, "text/html");
+    const imgs = Array.from(doc.getElementsByTagName("img"));
+    images.forEach((imgInfo) => {
+      const el = imgs[imgInfo.index];
+      if (el) el.setAttribute("alt", imgInfo.alt);
+    });
+    setModifiedHtml(doc.body.innerHTML);
+  }
+
+  return (
+    <div>
+      <p>Images with no alt text: {images.filter((i) => !i.alt || i.alt.trim() === "").length}</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        {images.map((imgInfo) => (
+          <div key={imgInfo.index} style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+            <img src={imgInfo.src} alt={imgInfo.alt} style={{ maxWidth: 120, maxHeight: 80, objectFit: "contain" }} />
+            <div>
+              <input
+                value={imgInfo.alt}
+                onChange={(e) => setImages((prev) => prev.map((it) => (it.index === imgInfo.index ? { ...it, alt: e.target.value } : it)))}
+              />
+              <button onClick={() => updateAltAt(imgInfo.index, imgInfo.alt)}>Update</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: "1rem" }}>
+        <button onClick={updateAll}>Update All</button>
+      </div>
+
+      <h4>Preview</h4>
+      <div dangerouslySetInnerHTML={{ __html: modifiedHtml ?? "" }} />
+    </div>
   );
 }
