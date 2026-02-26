@@ -20,7 +20,8 @@ export default function App() {
       <s-app-nav>
         <s-link href="/app">Home</s-link>
         <s-link href="/app/testing-sean">Testing page Sean</s-link>
-        <s-link href="/app/testing">Testing page</s-link>
+        <s-link href="/app/qa">QA Testing</s-link>
+        <s-link href="/app/qa-manual">QA Testing - Manual</s-link>
       </s-app-nav>
       <Outlet />
     </AppProvider>
