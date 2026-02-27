@@ -1,15 +1,22 @@
 import React, { useEffect, useState } from "react";
-import { useLoaderData } from "react-router";
+import {
+  useLoaderData,
+  useFetcher,
+  type LoaderFunctionArgs,
+  type ActionFunctionArgs,
+} from "react-router";
 
-import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 
-// ...existing code...
+/* =========================
+   TYPES
+========================= */
+
 type ArticleNode = {
   id: string;
   title: string;
   handle?: string;
-  body?: string; // HTML string
+  body?: string;
   summary?: string;
 };
 
@@ -38,217 +45,232 @@ type ImgInfo = {
   index: number;
 };
 
+/* =========================
+   LOADER (READ)
+========================= */
+
 export const loader = async ({
   request,
 }: LoaderFunctionArgs): Promise<{ blogs: BlogEdge[] }> => {
   const { admin } = await authenticate.admin(request);
 
-  const response = await admin.graphql(
-    `#graphql
-      query GetBlogs {
-        blogs(first: 5) {
-          edges {
-            node {
-              id
-              title
-              handle
-              articles(first: 5) {
-                edges {
-                  node {
-                    id
-                    title
-                    handle
-                    body
-                    summary
-                  }
+  const response = await admin.graphql(`
+    query GetBlogs {
+      blogs(first: 5) {
+        edges {
+          node {
+            id
+            title
+            handle
+            articles(first: 5) {
+              edges {
+                node {
+                  id
+                  title
+                  handle
+                  body
+                  summary
                 }
               }
             }
           }
         }
       }
-    `
-  );
+    }
+  `);
 
-  const responseJson = await response.json();
+  const json = await response.json();
 
   return {
-    blogs: responseJson.data.blogs.edges,
+    blogs: json.data.blogs.edges,
   };
 };
 
-function countImagesWithoutAlt(html?: string | null): number {
-  if (!html) return 0;
+/* =========================
+   ACTION (WRITE)
+========================= */
 
-  // Browser DOMParser when available (client-side)
-  if (typeof DOMParser !== "undefined") {
-    try {
-      const doc = new DOMParser().parseFromString(html, "text/html");
-      const imgs = Array.from(doc.getElementsByTagName("img"));
-      return imgs.filter(
-        (img) => !img.hasAttribute("alt") || (img.getAttribute("alt") ?? "").trim() === ""
-      ).length;
-    } catch {
-      // fall through to regex fallback
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { admin } = await authenticate.admin(request);
+  const formData = await request.formData();
+
+  const articleId = formData.get("articleId") as string;
+  const body = formData.get("body") as string;
+
+  const response = await admin.graphql(
+  `
+  mutation articleUpdate($id: ID!, $article: ArticleUpdateInput!) {
+    articleUpdate(id: $id, article: $article) {
+      article {
+        id
+        body
+      }
+      userErrors {
+        field
+        message
+      }
     }
   }
+  `,
+  {
+    variables: {
+      id: articleId,
+      article: {
+        body: body,
+      },
+    },
+  }
+);
 
-  // Fallback for non-DOM environments (simple, pragmatic)
-  const tags = html.match(/<img\b[^>]*>/gi) || [];
-  return tags.filter((tag) => {
-    const m = tag.match(/alt\s*=\s*(['"])(.*?)\1/i);
-    if (!m) return true; // no alt attribute
-    return m[2].trim() === ""; // alt exists but empty
-  }).length;
-}
+  const json = await response.json();
+
+  console.log("Mutation response:", json);
+
+  return json;
+};
+
+/* =========================
+   MAIN PAGE
+========================= */
 
 export default function TestingPageSean() {
   const { blogs = [] } = useLoaderData<typeof loader>();
 
   return (
-    <s-page heading="Blog Information">
-      {blogs.map((blogEdge: BlogEdge) => {
+    <div style={{ padding: "2rem" }}>
+      <h1>Blog Information</h1>
+
+      {blogs.map((blogEdge) => {
         const blog = blogEdge.node;
         const articles = blog.articles?.edges ?? [];
 
         return (
-          <div key={blog.id}>
+          <div key={blog.id} style={{ marginBottom: "3rem" }}>
             <h2>{blog.title}</h2>
             <p>
               <strong>Handle:</strong> {blog.handle}
             </p>
-            <br />
 
-            {articles.map((articleEdge: ArticleEdge) => {
+            {articles.map((articleEdge) => {
               const article = articleEdge.node;
 
               return (
-                <div key={article.id}>
-                  <s-section heading={article.title}>
-                    <h3>Summary</h3>
+                <>
+                  <s-section heading="Multiple pages" key={article.id}>
+                    <h3>{article.title}</h3>
                     <p>{article.summary}</p>
-                    <h3>Images</h3>
+
                     <ArticleImageAltEditor article={article} />
                   </s-section>
-                  <br />
-                </div>
+                  <br></br>
+                </>
               );
             })}
           </div>
         );
       })}
-    </s-page>
+    </div>
   );
 }
 
+/* =========================
+   IMAGE EDITOR COMPONENT
+========================= */
+
 function extractImagesFromHtml(html?: string | null): ImgInfo[] {
   if (!html) return [];
-  if (typeof DOMParser !== "undefined") {
-    try {
-      const doc = new DOMParser().parseFromString(html, "text/html");
-      const imgs = Array.from(doc.getElementsByTagName("img"));
-      return imgs.map((img, i) => ({
-        src: img.getAttribute("src") ?? "",
-        alt: img.getAttribute("alt") ?? "",
-        index: i,
-      }));
-    } catch {
-      // fall through to regex fallback
-    }
-  }
 
-  const tags = html.match(/<img\b[^>]*>/gi) || [];
-  return tags.map((tag, i) => {
-    const srcMatch = tag.match(/src\s*=\s*(['"])(.*?)\1/i);
-    const altMatch = tag.match(/alt\s*=\s*(['"])(.*?)\1/i);
-    return {
-      src: srcMatch ? srcMatch[2] : "",
-      alt: altMatch ? altMatch[2] : "",
-      index: i,
-    };
-  });
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const imgs = Array.from(doc.getElementsByTagName("img"));
+
+  return imgs.map((img, i) => ({
+    src: img.getAttribute("src") ?? "",
+    alt: img.getAttribute("alt") ?? "",
+    index: i,
+  }));
 }
 
 function ArticleImageAltEditor({ article }: { article: ArticleNode }) {
-  const [mounted, setMounted] = useState(false);
+  const fetcher = useFetcher();
+
   const [images, setImages] = useState<ImgInfo[]>([]);
   const [modifiedHtml, setModifiedHtml] = useState(article.body ?? "");
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
     setImages(extractImagesFromHtml(modifiedHtml));
-  }, [mounted, modifiedHtml]);
+  }, [modifiedHtml]);
 
-  function updateAltAt(index: number, newAlt: string) {
-    if (typeof DOMParser === "undefined") {
-      setImages((prev) => prev.map((img) => (img.index === index ? { ...img, alt: newAlt } : img)));
-      setModifiedHtml((prev) => {
-        const tags = prev.match(/<img\b[^>]*>/gi) || [];
-        const tag = tags[index];
-        if (!tag) return prev;
-        let newTag = tag;
-        if (/alt\s*=/.test(tag)) {
-          newTag = tag.replace(/alt\s*=\s*(['"])(.*?)\1/i, `alt="${newAlt}"`);
-        } else {
-          newTag = tag.replace(/<img\b/, `<img alt="${newAlt}"`);
-        }
-        return prev.replace(tag, newTag);
-      });
-      return;
-    }
-
+  function updateAlt(index: number, newAlt: string) {
     const doc = new DOMParser().parseFromString(modifiedHtml, "text/html");
     const imgs = Array.from(doc.getElementsByTagName("img"));
-    const target = imgs[index];
-    if (!target) return;
-    target.setAttribute("alt", newAlt);
+
+    if (!imgs[index]) return;
+
+    imgs[index].setAttribute("alt", newAlt);
+
     setModifiedHtml(doc.body.innerHTML);
-    setImages(Array.from(doc.getElementsByTagName("img")).map((img, i) => ({
-      src: img.getAttribute("src") ?? "",
-      alt: img.getAttribute("alt") ?? "",
-      index: i,
-    })));
   }
 
-  function updateAll() {
-    if (typeof DOMParser === "undefined") return;
-    const doc = new DOMParser().parseFromString(modifiedHtml, "text/html");
-    const imgs = Array.from(doc.getElementsByTagName("img"));
-    images.forEach((imgInfo) => {
-      const el = imgs[imgInfo.index];
-      if (el) el.setAttribute("alt", imgInfo.alt);
-    });
-    setModifiedHtml(doc.body.innerHTML);
+  function saveToShopify() {
+    fetcher.submit(
+      {
+        articleId: article.id,
+        body: modifiedHtml,
+      },
+      { method: "post" }
+    );
   }
+
+  const missingAltCount = images.filter(
+    (i) => !i.alt || i.alt.trim() === ""
+  ).length;
 
   return (
-    <div>
-      <p>Images with no alt text: {images.filter((i) => !i.alt || i.alt.trim() === "").length}</p>
-      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        {images.map((imgInfo) => (
-          <div key={imgInfo.index} style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-            <img src={imgInfo.src} alt={imgInfo.alt} style={{ maxWidth: 120, maxHeight: 80, objectFit: "contain" }} />
-            <div>
-              <input
-                value={imgInfo.alt}
-                onChange={(e) => setImages((prev) => prev.map((it) => (it.index === imgInfo.index ? { ...it, alt: e.target.value } : it)))}
-              />
-              <button onClick={() => updateAltAt(imgInfo.index, imgInfo.alt)}>Update</button>
-            </div>
-          </div>
-        ))}
-      </div>
+    <div style={{ marginTop: "1rem" }}>
+      <p>
+        <strong>Images missing alt text:</strong> {missingAltCount}
+      </p>
 
-      <div style={{ marginTop: "1rem" }}>
-        <button onClick={updateAll}>Update All</button>
-      </div>
+      {images.map((img, i) => (
+        <div
+          key={i}
+          style={{
+            display: "flex",
+            gap: "1rem",
+            alignItems: "center",
+            marginBottom: "1rem",
+          }}
+        >
+          <img
+            src={img.src}
+            alt={img.alt}
+            style={{ width: 120, height: 80, objectFit: "contain" }}
+          />
 
-      <h4>Preview</h4>
-      <div dangerouslySetInnerHTML={{ __html: modifiedHtml ?? "" }} />
+          <input
+            value={img.alt}
+            onChange={(e) => updateAlt(i, e.target.value)}
+            placeholder="Enter alt text"
+          />
+        </div>
+      ))}
+
+      <button
+        onClick={saveToShopify}
+        style={{
+          marginTop: "1rem",
+          padding: "0.5rem 1rem",
+          cursor: "pointer",
+        }}
+      >
+        Save to Shopify
+      </button>
+
+      {/* <h4 style={{ marginTop: "2rem" }}>Preview</h4>
+      <div
+        dangerouslySetInnerHTML={{ __html: modifiedHtml }}
+        style={{ border: "1px solid #ddd", padding: "1rem" }}
+      /> */}
     </div>
   );
 }
