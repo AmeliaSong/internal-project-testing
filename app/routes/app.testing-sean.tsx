@@ -227,6 +227,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       // 6. Swap old src → new CDN URL in the article HTML
       const updatedBody = body.split(imgSrc).join(newUrl);
 
+      // 7. Persist the updated HTML back to the article
+      const updateRes = await admin.graphql(
+        `
+        mutation articleUpdate($id: ID!, $article: ArticleUpdateInput!) {
+          articleUpdate(id: $id, article: $article) {
+            article { id body }
+            userErrors { field message }
+          }
+        }
+        `,
+        { variables: { id: articleId, article: { body: updatedBody } } }
+      );
+      const updateJson = await updateRes.json();
+      const updateErrors = updateJson.data.articleUpdate.userErrors;
+      if (updateErrors?.length) throw new Error(updateErrors[0].message);
+
       return { success: true, newUrl, imgIndex, updatedBody };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown error";
