@@ -227,6 +227,22 @@ function ArticleImageAltEditor({ article }: { article: ArticleNode }) {
 
   return (
     <div style={{ marginTop: "1rem" }}>
+      {/* Image Source Links Section */}
+      <div style={{ marginBottom: "2rem", padding: "1rem", backgroundColor: "#f5f5f5", borderRadius: "4px" }}>
+        <h4 style={{ marginTop: 0 }}>Image Source Links ({images.length})</h4>
+        {images.length > 0 ? (
+          <ul style={{ marginBottom: 0 }}>
+            {images.map((img, i) => (
+              <li key={i} style={{ marginBottom: "0.5rem", wordBreak: "break-all" }}>
+                <strong>Image {i + 1}:</strong> {img.src}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p style={{ marginBottom: 0, color: "#666" }}>No images found in this article</p>
+        )}
+      </div>
+
       <p>
         <strong>Images missing alt text:</strong> {missingAltCount}
       </p>
