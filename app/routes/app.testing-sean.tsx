@@ -312,6 +312,144 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
+  /* ------ Import an external image for a metaobject field ------ */
+  if (intent === "importMetaobjectImage") {
+    const imgSrc = formData.get("imgSrc") as string;
+    const metaobjectId = formData.get("metaobjectId") as string;
+    const fieldKey = formData.get("fieldKey") as string;
+
+    try {
+      const imageRes = await fetch(imgSrc);
+      if (!imageRes.ok)
+        throw new Error(`Failed to fetch image: ${imageRes.statusText}`);
+      const imageBuffer = await imageRes.arrayBuffer();
+      const mimeType =
+        imageRes.headers.get("content-type")?.split(";")[0] ?? "image/jpeg";
+      const fileSize = imageBuffer.byteLength.toString();
+      const filename =
+        decodeURIComponent(
+          imgSrc.split("/").pop()?.split("?")[0] ?? "image.jpg"
+        ) || "image.jpg";
+
+      const stagedRes = await admin.graphql(
+        `
+        mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
+          stagedUploadsCreate(input: $input) {
+            stagedTargets {
+              url
+              resourceUrl
+              parameters { name value }
+            }
+            userErrors { field message }
+          }
+        }
+        `,
+        {
+          variables: {
+            input: [
+              { filename, mimeType, resource: "FILE", fileSize, httpMethod: "PUT" },
+            ],
+          },
+        }
+      );
+      const stagedJson = await stagedRes.json();
+      const stagedErrors = stagedJson.data.stagedUploadsCreate.userErrors;
+      if (stagedErrors?.length) throw new Error(stagedErrors[0].message);
+      const target = stagedJson.data.stagedUploadsCreate.stagedTargets[0];
+
+      const uploadRes = await fetch(target.url, {
+        method: "PUT",
+        body: imageBuffer,
+        headers: { "Content-Type": mimeType, "Content-Length": fileSize },
+      });
+      if (!uploadRes.ok)
+        throw new Error(`Upload failed: ${uploadRes.statusText}`);
+
+      const fileCreateRes = await admin.graphql(
+        `
+        mutation fileCreate($files: [FileCreateInput!]!) {
+          fileCreate(files: $files) {
+            files {
+              id
+              fileStatus
+              ... on MediaImage { image { url } }
+              ... on GenericFile { url }
+            }
+            userErrors { field message }
+          }
+        }
+        `,
+        {
+          variables: {
+            files: [{ originalSource: target.resourceUrl, contentType: "IMAGE" }],
+          },
+        }
+      );
+      const fileJson = await fileCreateRes.json();
+      const fileErrors = fileJson.data.fileCreate.userErrors;
+      if (fileErrors?.length) throw new Error(fileErrors[0].message);
+
+      const createdFileId: string = fileJson.data.fileCreate.files[0]?.id;
+      if (!createdFileId) throw new Error("No file ID returned from fileCreate");
+
+      let newUrl: string | null = null;
+      const maxAttempts = 15;
+      const delayMs = 1500;
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise((r) => setTimeout(r, delayMs));
+        const pollRes = await admin.graphql(
+          `
+          query getFile($id: ID!) {
+            node(id: $id) {
+              ... on MediaImage { fileStatus image { url } }
+              ... on GenericFile { fileStatus url }
+            }
+          }
+          `,
+          { variables: { id: createdFileId } }
+        );
+        const pollJson = await pollRes.json();
+        const node = pollJson.data?.node;
+        const status: string = node?.fileStatus ?? "";
+        const candidateUrl: string = node?.image?.url ?? node?.url ?? "";
+        if (status === "READY" && candidateUrl.startsWith("https://cdn.shopify.com")) {
+          newUrl = candidateUrl;
+          break;
+        }
+        if (status === "FAILED") throw new Error("Shopify file processing failed");
+      }
+
+      if (!newUrl) throw new Error("Timed out waiting for Shopify CDN URL");
+
+      // Update the metaobject field to the new CDN URL
+      const updateRes = await admin.graphql(
+        `
+        mutation metaobjectUpdate($id: ID!, $metaobject: MetaobjectUpdateInput!) {
+          metaobjectUpdate(id: $id, metaobject: $metaobject) {
+            metaobject { id handle }
+            userErrors { field message }
+          }
+        }
+        `,
+        {
+          variables: {
+            id: metaobjectId,
+            metaobject: { fields: [{ key: fieldKey, value: newUrl }] },
+          },
+        }
+      );
+      const updateJson = await updateRes.json();
+      const updateErrors = updateJson.data.metaobjectUpdate.userErrors;
+      if (updateErrors?.length) throw new Error(updateErrors[0].message);
+
+      return { success: true, newUrl, fieldKey, metaobjectId };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      return { success: false, error: message };
+    }
+  }
+
   /* ------ Default: save article body ------ */
   const articleId = formData.get("articleId") as string;
   const body = formData.get("body") as string;
@@ -440,17 +578,11 @@ export default function TestingPageSean() {
                           </thead>
                           <tbody>
                             {entry.fields.map((field) => (
-                              <tr key={field.key}>
-                                <td style={tdStyle}>
-                                  <code style={{ fontSize: "0.82rem" }}>{field.key}</code>
-                                </td>
-                                <td style={tdStyle}>
-                                  <span style={typeBadgeStyle}>{field.type}</span>
-                                </td>
-                                <td style={{ ...tdStyle, wordBreak: "break-all", maxWidth: "320px" }}>
-                                  {field.value ?? <span style={{ color: "#aaa" }}>—</span>}
-                                </td>
-                              </tr>
+                              <MetaobjectFieldRow
+                                key={field.key}
+                                field={field}
+                                metaobjectId={entry.id}
+                              />
                             ))}
                           </tbody>
                         </table>
@@ -468,6 +600,102 @@ export default function TestingPageSean() {
         </div>
       </details>
     </div>
+  );
+}
+
+/* =========================
+   METAOBJECT FIELD ROW
+========================= */
+
+const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|webp|gif|avif|svg)(\?.*)?$/i;
+
+function isExternalImageUrl(value: string | null): boolean {
+  if (!value) return false;
+  return IMAGE_EXTENSIONS.test(value) && !value.includes("cdn.shopify.com");
+}
+
+function MetaobjectFieldRow({
+  field,
+  metaobjectId,
+}: {
+  field: MetaobjectField;
+  metaobjectId: string;
+}) {
+  const fetcher = useFetcher();
+  const [currentValue, setCurrentValue] = useState(field.value);
+
+  const isImporting = fetcher.state !== "idle";
+
+  // When the import finishes, update the displayed value
+  const prevState = React.useRef(fetcher.state);
+  useEffect(() => {
+    const prev = prevState.current;
+    prevState.current = fetcher.state;
+    if (prev !== "idle" && fetcher.state === "idle" && fetcher.data) {
+      const data = fetcher.data as any;
+      if (data.success && data.fieldKey === field.key && data.metaobjectId === metaobjectId) {
+        setCurrentValue(data.newUrl);
+      }
+    }
+  }, [fetcher.state, fetcher.data, field.key, metaobjectId]);
+
+  const showImportButton = isExternalImageUrl(currentValue);
+
+  function handleImport() {
+    fetcher.submit(
+      {
+        intent: "importMetaobjectImage",
+        imgSrc: currentValue!,
+        metaobjectId,
+        fieldKey: field.key,
+      },
+      { method: "post" }
+    );
+  }
+
+  return (
+    <tr>
+      <td style={tdStyle}>
+        <code style={{ fontSize: "0.82rem" }}>{field.key}</code>
+      </td>
+      <td style={tdStyle}>
+        <span style={typeBadgeStyle}>{field.type}</span>
+      </td>
+      <td style={{ ...tdStyle, wordBreak: "break-all", maxWidth: "320px" }}>
+        {currentValue ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+            <span>{currentValue}</span>
+            {showImportButton && (
+              <button
+                onClick={handleImport}
+                disabled={isImporting}
+                style={{
+                  alignSelf: "flex-start",
+                  padding: "0.2rem 0.6rem",
+                  fontSize: "0.78rem",
+                  cursor: isImporting ? "not-allowed" : "pointer",
+                  opacity: isImporting ? 0.6 : 1,
+                }}
+              >
+                {isImporting ? "Importing…" : "Import to Shopify CDN"}
+              </button>
+            )}
+            {!showImportButton && currentValue.includes("cdn.shopify.com") && IMAGE_EXTENSIONS.test(currentValue) && (
+              <span style={{ fontSize: "0.75rem", color: "#2e7d32", fontWeight: 600 }}>
+                ✓ Already on Shopify CDN
+              </span>
+            )}
+            {fetcher.state === "idle" && (fetcher.data as any)?.success === false && (
+              <span style={{ fontSize: "0.78rem", color: "red" }}>
+                ⚠ {(fetcher.data as any).error}
+              </span>
+            )}
+          </div>
+        ) : (
+          <span style={{ color: "#aaa" }}>—</span>
+        )}
+      </td>
+    </tr>
   );
 }
 
