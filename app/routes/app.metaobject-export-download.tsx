@@ -20,6 +20,10 @@ type DefinitionConnection = {
 type MetaobjectNode = {
   id: string;
   handle: string;
+  fields?: Array<{
+    key: string;
+    value: string | null;
+  }>;
 };
 
 type MetaobjectEdge = {
@@ -79,7 +83,8 @@ async function fetchAllDefinitionEdges(admin: Awaited<ReturnType<typeof authenti
 
 async function fetchAllMetaobjectsByType(
   admin: Awaited<ReturnType<typeof authenticate.admin>>["admin"],
-  type: string
+  type: string,
+  includeFieldValues: boolean
 ) {
   const allEntries: MetaobjectNode[] = [];
   let after: string | null = null;
@@ -88,12 +93,16 @@ async function fetchAllMetaobjectsByType(
   while (hasNextPage) {
     const response: Response = await admin.graphql(
       `
-      query GetMetaobjectsByType($type: String!, $after: String) {
+      query GetMetaobjectsByType($type: String!, $after: String, $includeFieldValues: Boolean!) {
         metaobjects(type: $type, first: 250, after: $after) {
           edges {
             node {
               id
               handle
+              fields @include(if: $includeFieldValues) {
+                key
+                value
+              }
             }
           }
           pageInfo {
@@ -103,7 +112,7 @@ async function fetchAllMetaobjectsByType(
         }
       }
       `,
-      { variables: { type, after } }
+      { variables: { type, after, includeFieldValues } }
     );
 
     const json: any = await response.json();
@@ -118,24 +127,41 @@ async function fetchAllMetaobjectsByType(
   return allEntries;
 }
 
+function serializeFieldValues(fields: MetaobjectNode["fields"]): string {
+  if (!fields || fields.length === 0) {
+    return "";
+  }
+
+  const valuesByKey = Object.fromEntries(fields.map((field) => [field.key, field.value ?? ""]));
+  return JSON.stringify(valuesByKey);
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
+  const requestUrl = new URL(request.url);
+  const includeFieldValues = requestUrl.searchParams.get("includeFieldValues") === "1";
 
   const definitionEdges = await fetchAllDefinitionEdges(admin);
 
   const rows: string[] = [];
 
   for (const { node: definition } of definitionEdges) {
-    const entries = await fetchAllMetaobjectsByType(admin, definition.type);
+    const entries = await fetchAllMetaobjectsByType(admin, definition.type, includeFieldValues);
 
     for (const entry of entries) {
-      rows.push([definition.type, definition.name, entry.id, entry.handle].map(csvEscape).join(","));
+      const rowValues = [definition.type, definition.name, entry.id, entry.handle];
+      if (includeFieldValues) {
+        rowValues.push(serializeFieldValues(entry.fields));
+      }
+      rows.push(rowValues.map(csvEscape).join(","));
     }
   }
 
-  const headerRow = ["metaobjectType", "metaobjectName", "entryId", "entryHandle"]
-    .map(csvEscape)
-    .join(",");
+  const headerValues = ["metaobjectType", "metaobjectName", "entryId", "entryHandle"];
+  if (includeFieldValues) {
+    headerValues.push("fieldValuesJson");
+  }
+  const headerRow = headerValues.map(csvEscape).join(",");
 
   const csv = [headerRow, ...rows].join("\n");
   const filename = `metaobjects-export-${new Date().toISOString().slice(0, 10)}.csv`;

@@ -19,13 +19,19 @@ function parseFilename(contentDisposition: string | null): string {
 export default function MetaobjectExport() {
   const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [includeFieldValues, setIncludeFieldValues] = useState(false);
 
   const handleExport = async () => {
     setIsExporting(true);
     setErrorMessage(null);
 
     try {
-      const response = await fetch(DOWNLOAD_PATH, {
+      const params = new URLSearchParams();
+      if (includeFieldValues) {
+        params.set("includeFieldValues", "1");
+      }
+
+      const response = await fetch(`${DOWNLOAD_PATH}${params.toString() ? `?${params.toString()}` : ""}`, {
         method: "GET",
         headers: {
           Accept: "text/csv",
@@ -61,6 +67,17 @@ export default function MetaobjectExport() {
         Export all metaobjects into a CSV where each row is one metaobject entry with core columns:
         type, name, ID, and handle.
       </p>
+
+      <label style={{ display: "block", marginBottom: "0.75rem" }}>
+        <input
+          type="checkbox"
+          checked={includeFieldValues}
+          onChange={(event) => setIncludeFieldValues(event.currentTarget.checked)}
+          disabled={isExporting}
+          style={{ marginRight: "0.5rem" }}
+        />
+        Include metaobject field values
+      </label>
 
       <button type="button" onClick={handleExport} disabled={isExporting}>
         {isExporting ? "Exporting..." : "Export all metaobjects to CSV"}
