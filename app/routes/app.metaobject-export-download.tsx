@@ -127,15 +127,6 @@ async function fetchAllMetaobjectsByType(
   return allEntries;
 }
 
-function serializeFieldValues(fields: MetaobjectNode["fields"]): string {
-  if (!fields || fields.length === 0) {
-    return "";
-  }
-
-  const valuesByKey = Object.fromEntries(fields.map((field) => [field.key, field.value ?? ""]));
-  return JSON.stringify(valuesByKey);
-}
-
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
   const requestUrl = new URL(request.url);
@@ -149,18 +140,28 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const entries = await fetchAllMetaobjectsByType(admin, definition.type, includeFieldValues);
 
     for (const entry of entries) {
-      const rowValues = [definition.type, definition.name, entry.id, entry.handle];
       if (includeFieldValues) {
-        rowValues.push(serializeFieldValues(entry.fields));
+        const fields = entry.fields ?? [];
+
+        if (fields.length === 0) {
+          rows.push([entry.handle, definition.type, definition.name, "", ""].map(csvEscape).join(","));
+          continue;
+        }
+
+        for (const field of fields) {
+          rows.push(
+            [entry.handle, definition.type, definition.name, field.key, field.value ?? ""]
+              .map(csvEscape)
+              .join(",")
+          );
+        }
+      } else {
+        rows.push([entry.handle, definition.type, definition.name, "", ""].map(csvEscape).join(","));
       }
-      rows.push(rowValues.map(csvEscape).join(","));
     }
   }
 
-  const headerValues = ["metaobjectType", "metaobjectName", "entryId", "entryHandle"];
-  if (includeFieldValues) {
-    headerValues.push("fieldValuesJson");
-  }
+  const headerValues = ["handle", "definitionType", "definitionName", "field", "value"];
   const headerRow = headerValues.map(csvEscape).join(",");
 
   const csv = [headerRow, ...rows].join("\n");
