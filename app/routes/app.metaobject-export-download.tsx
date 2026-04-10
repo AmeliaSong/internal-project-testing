@@ -38,6 +38,71 @@ type MetaobjectConnection = {
   };
 };
 
+type ProductEdge = {
+  node: {
+    handle: string;
+  };
+};
+
+type ProductConnection = {
+  edges: ProductEdge[];
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
+};
+
+type CollectionEdge = {
+  node: {
+    handle: string;
+  };
+};
+
+type CollectionConnection = {
+  edges: CollectionEdge[];
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
+};
+
+type ArticleEdge = {
+  node: {
+    handle: string;
+    blog: {
+      handle: string;
+    } | null;
+  };
+};
+
+type ArticleConnection = {
+  edges: ArticleEdge[];
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
+};
+
+type PageEdge = {
+  node: {
+    handle: string;
+  };
+};
+
+type PageConnection = {
+  edges: PageEdge[];
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
+};
+
+type ExportResource = "metaobjects" | "products" | "collections" | "articles" | "pages";
+
+function isExportResource(value: string | null): value is ExportResource {
+  return value === "metaobjects" || value === "products" || value === "collections" || value === "articles" || value === "pages";
+}
+
 function csvEscape(value: unknown): string {
   const stringValue = value == null ? "" : String(value);
   return `"${stringValue.replace(/"/g, '""')}"`;
@@ -127,10 +192,235 @@ async function fetchAllMetaobjectsByType(
   return allEntries;
 }
 
+async function fetchAllProductHandles(admin: Awaited<ReturnType<typeof authenticate.admin>>["admin"]) {
+  const handles: string[] = [];
+  let after: string | null = null;
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    const response: Response = await admin.graphql(
+      `
+      query GetProductHandles($after: String) {
+        products(first: 250, after: $after) {
+          edges {
+            node {
+              handle
+            }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+      `,
+      { variables: { after } }
+    );
+
+    const json: any = await response.json();
+    const connection: ProductConnection | undefined = json?.data?.products;
+    const entries = (connection?.edges ?? []).map((edge) => edge.node.handle);
+    handles.push(...entries);
+
+    hasNextPage = Boolean(connection?.pageInfo?.hasNextPage);
+    after = connection?.pageInfo?.endCursor ?? null;
+  }
+
+  return handles;
+}
+
+async function fetchAllCollectionHandles(admin: Awaited<ReturnType<typeof authenticate.admin>>["admin"]) {
+  const handles: string[] = [];
+  let after: string | null = null;
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    const response: Response = await admin.graphql(
+      `
+      query GetCollectionHandles($after: String) {
+        collections(first: 250, after: $after) {
+          edges {
+            node {
+              handle
+            }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+      `,
+      { variables: { after } }
+    );
+
+    const json: any = await response.json();
+    const connection: CollectionConnection | undefined = json?.data?.collections;
+    const entries = (connection?.edges ?? []).map((edge) => edge.node.handle);
+    handles.push(...entries);
+
+    hasNextPage = Boolean(connection?.pageInfo?.hasNextPage);
+    after = connection?.pageInfo?.endCursor ?? null;
+  }
+
+  return handles;
+}
+
+async function fetchAllArticleHandlesWithBlogs(admin: Awaited<ReturnType<typeof authenticate.admin>>["admin"]) {
+  const entries: Array<{ blogHandle: string; handle: string }> = [];
+  let after: string | null = null;
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    const response: Response = await admin.graphql(
+      `
+      query GetArticleHandles($after: String) {
+        articles(first: 250, after: $after) {
+          edges {
+            node {
+              handle
+              blog {
+                handle
+              }
+            }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+      `,
+      { variables: { after } }
+    );
+
+    const json: any = await response.json();
+    const connection: ArticleConnection | undefined = json?.data?.articles;
+    const pageEntries = (connection?.edges ?? []).map((edge) => ({
+      blogHandle: edge.node.blog?.handle ?? "",
+      handle: edge.node.handle,
+    }));
+    entries.push(...pageEntries);
+
+    hasNextPage = Boolean(connection?.pageInfo?.hasNextPage);
+    after = connection?.pageInfo?.endCursor ?? null;
+  }
+
+  return entries;
+}
+
+async function fetchAllPageHandles(admin: Awaited<ReturnType<typeof authenticate.admin>>["admin"]) {
+  const handles: string[] = [];
+  let after: string | null = null;
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    const response: Response = await admin.graphql(
+      `
+      query GetPageHandles($after: String) {
+        pages(first: 250, after: $after) {
+          edges {
+            node {
+              handle
+            }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+      `,
+      { variables: { after } }
+    );
+
+    const json: any = await response.json();
+    const connection: PageConnection | undefined = json?.data?.pages;
+    const entries = (connection?.edges ?? []).map((edge) => edge.node.handle);
+    handles.push(...entries);
+
+    hasNextPage = Boolean(connection?.pageInfo?.hasNextPage);
+    after = connection?.pageInfo?.endCursor ?? null;
+  }
+
+  return handles;
+}
+
+function buildHandleCsv(headers: string[], rows: string[][]) {
+  const headerRow = headers.map(csvEscape).join(",");
+  const dataRows = rows.map((row) => row.map(csvEscape).join(","));
+  return [headerRow, ...dataRows].join("\n");
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
   const requestUrl = new URL(request.url);
+  const resourceParam = requestUrl.searchParams.get("resource");
+  const resource: ExportResource = isExportResource(resourceParam) ? resourceParam : "metaobjects";
   const includeFieldValues = requestUrl.searchParams.get("includeFieldValues") === "1";
+
+  if (resource === "products") {
+    const handles = await fetchAllProductHandles(admin);
+    const csv = buildHandleCsv(["handle"], handles.map((handle) => [handle]));
+    const filename = `product-handles-export-${new Date().toISOString().slice(0, 10)}.csv`;
+
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+
+  if (resource === "collections") {
+    const handles = await fetchAllCollectionHandles(admin);
+    const csv = buildHandleCsv(["handle"], handles.map((handle) => [handle]));
+    const filename = `collection-handles-export-${new Date().toISOString().slice(0, 10)}.csv`;
+
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+
+  if (resource === "articles") {
+    const entries = await fetchAllArticleHandlesWithBlogs(admin);
+    const csv = buildHandleCsv(
+      ["blogHandle", "articleHandle"],
+      entries.map((entry) => [entry.blogHandle, entry.handle])
+    );
+    const filename = `blog-post-handles-export-${new Date().toISOString().slice(0, 10)}.csv`;
+
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+
+  if (resource === "pages") {
+    const handles = await fetchAllPageHandles(admin);
+    const csv = buildHandleCsv(["handle"], handles.map((handle) => [handle]));
+    const filename = `page-handles-export-${new Date().toISOString().slice(0, 10)}.csv`;
+
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
 
   const definitionEdges = await fetchAllDefinitionEdges(admin);
 
