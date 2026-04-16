@@ -1085,7 +1085,7 @@ export default function TestingPageSean() {
               >
                 <s-clickable 
                   borderRadius="base"
-                  padding="base"
+                  padding="small"
                   onClick={() => toggleBlog(blog.id)}
                 >
                   <s-stack
@@ -1099,7 +1099,7 @@ export default function TestingPageSean() {
                       <s-badge><code>{blog.handle}</code></s-badge>
                       <s-badge>{articles.length} articles</s-badge>
                     </s-stack>
-                    {isBlogOpen ? <s-icon type="caret-up"></s-icon> : <s-icon type="caret-down"></s-icon>}
+                    {isBlogOpen ? <s-icon type="caret-up"/> : <s-icon type="caret-down"/>}
                   </s-stack>
                 </s-clickable>
 
@@ -1108,17 +1108,16 @@ export default function TestingPageSean() {
                   padding="small"
                   background="base"
                   borderRadius="none none base base"
+                  gap="small"
                 >
                   {articles.map((articleEdge) => {
                     const article = articleEdge.node;
                     const isArticleOpen = openArticles[article.id] ?? false;
-                    const articleNumber = articles.indexOf(articleEdge) + 1;
 
                     return (
                       <ArticleImageAltEditor 
                         key={article.id}
-                        article={article} 
-                        articleNumber={articleNumber}
+                        article={article}
                         isArticleOpen={isArticleOpen}
                         onToggleArticle={() => toggleArticle(blog.id, article.id)}
                       />
@@ -1162,52 +1161,50 @@ export default function TestingPageSean() {
 
       {/* ── Pages ── */}
       <s-section>
-        <s-heading>
-          📄 Pages ({pages.length})
-          {allImportablePages.length > 0 && (
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                handleImportAllPageImages();
-              }}
-              disabled={isImportingAllPages}
-              style={{
-                marginLeft: "auto",
-                padding: "0.25rem 0.8rem",
-                fontSize: "0.8rem",
-                cursor: isImportingAllPages ? "not-allowed" : "pointer",
-                opacity: isImportingAllPages ? 0.6 : 1,
-              }}
-            >
-              {isImportingAllPages
-                ? "Importing…"
-                : `Import All Page Images (${allImportablePages.reduce((sum, p) => sum + p.images.length, 0)})`}
-            </button>
-          )}
-        </s-heading>
+        <s-stack gap="base">
+          <s-heading>
+            <s-stack direction="inline" alignItems="center" justifyContent="space-between">
+            📄 Pages ({pages.length})
+            {allImportablePages.length > 0 && (
+              <s-button
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleImportAllPageImages();
+                }}
+                disabled={isImportingAllPages}
+              >
+                {isImportingAllPages
+                  ? "Importing…"
+                  : `Import All Page Images (${allImportablePages.reduce((sum, p) => sum + p.images.length, 0)})`}
+              </s-button>
+            )}
+            </s-stack>
+          </s-heading>
+          
 
-        {((pageBatchFetcher.data as any)?.errors?.length ?? 0) > 0 && (
-          <div style={{ padding: "0.5rem 1rem", color: "red", fontSize: "0.82rem" }}>
-            {(pageBatchFetcher.data as any).errors.map((e: string, i: number) => (
-              <div key={i}>⚠ {e}</div>
+          {((pageBatchFetcher.data as any)?.errors?.length ?? 0) > 0 && (
+            <s-banner heading="Error" tone="critical">
+              {(pageBatchFetcher.data as any).errors.map((e: string, i: number) => (
+                <s-text key={i}><s-icon type="alert-triangle"/> {e}</s-text>
+              ))}
+            </s-banner>
+          )}
+
+          <s-stack gap="small">
+            {pages.map((pageEdge) => (
+              <PageImageMigrationEditor
+                key={pageEdge.node.id}
+                page={pageEdge.node}
+                body={pageBodies[pageEdge.node.id] ?? pageEdge.node.body ?? ""}
+                onBodyUpdated={handlePageBodyUpdated}
+              />
             ))}
-          </div>
-        )}
 
-        <div style={{ padding: "1rem 0" }}>
-          {pages.map((pageEdge) => (
-            <PageImageMigrationEditor
-              key={pageEdge.node.id}
-              page={pageEdge.node}
-              body={pageBodies[pageEdge.node.id] ?? pageEdge.node.body ?? ""}
-              onBodyUpdated={handlePageBodyUpdated}
-            />
-          ))}
-
-          {pages.length === 0 && (
-            <s-text color="subdued"><em>No pages found</em></s-text>
-          )}
-        </div>
+            {pages.length === 0 && (
+              <s-text color="subdued"><em>No pages found</em></s-text>
+            )}
+          </s-stack>
+        </s-stack>
       </s-section>
     </s-page>
   );
@@ -1293,7 +1290,7 @@ function MetaobjectGroupView({ group, isOpen, onToggle }: { group: MetaobjectGro
     >
       <s-clickable 
         borderRadius="base"
-        padding="base"
+        padding="small"
         onClick={onToggle}
       >
         <s-stack
@@ -1319,7 +1316,7 @@ function MetaobjectGroupView({ group, isOpen, onToggle }: { group: MetaobjectGro
                   : `Import All Images (${allImportable.length})`}
               </s-button>
             )}
-            {isOpen ? <s-icon type="caret-up"></s-icon> : <s-icon type="caret-down"></s-icon>}
+            {isOpen ? <s-icon type="caret-up"/> : <s-icon type="caret-down"/>}
           </s-stack>
         </s-stack>
       </s-clickable>
@@ -1335,6 +1332,7 @@ function MetaobjectGroupView({ group, isOpen, onToggle }: { group: MetaobjectGro
           padding="small"
           background="base"
           borderRadius="none none base base"
+          gap="small"
         >
           {group.entries.length === 0 ? (
             <s-text color="subdued"><em>No entries</em></s-text>
@@ -1381,7 +1379,7 @@ function MetaobjectEntryView({
       >
         <s-stack direction="inline" alignItems="center" justifyContent="space-between" inlineSize="100%">
           <code style={{ fontSize: "0.82rem" }}>{entry.handle}</code>
-          {isOpen ? <s-icon type="caret-up"></s-icon> : <s-icon type="caret-down"></s-icon>}
+          {isOpen ? <s-icon type="caret-up"/> : <s-icon type="caret-down"/>}
         </s-stack>
       </s-clickable>
 
@@ -1529,6 +1527,7 @@ function PageImageMigrationEditor({
   onBodyUpdated: (pageId: string, updatedBody: string) => void;
 }) {
   const importFetcher = useFetcher();
+  const [isOpen, setIsOpen] = useState<boolean>(false);
   const [importingIndex, setImportingIndex] = useState<number | null>(null);
   const [importErrors, setImportErrors] = useState<Record<number, string>>({});
 
@@ -1586,77 +1585,98 @@ function PageImageMigrationEditor({
   }
 
   return (
-    <details style={nestedSectionStyle}>
-      <summary style={nestedSummaryStyle}>
-        {page.title}
-        <s-badge>
-          <code style={{ fontSize: "0.78rem" }}>{page.handle}</code>
-        </s-badge>
-        <s-badge>{images.length} images</s-badge>
-        <s-badge>{externalCount} external</s-badge>
-      </summary>
+    <s-stack
+      background="subdued"
+      borderWidth="base"
+      borderRadius="base"
+    >
+      <s-clickable 
+        borderRadius="base"
+        padding="base"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <s-stack
+          direction="inline"
+          alignItems="center"
+          justifyContent="space-between"
+          inlineSize="100%"
+        >
+          <s-stack direction="inline" alignItems="center" gap="base">
+            {page.title}
+            <s-badge>
+              <code style={{ fontSize: "0.78rem" }}>{page.handle}</code>
+            </s-badge>
+            <s-badge>{images.length} images</s-badge>
+            <s-badge>{externalCount} external</s-badge>
+          </s-stack>
+          {isOpen ? <s-icon type="caret-up"/> : <s-icon type="caret-down"/>}
+        </s-stack>
+      </s-clickable>
 
-      <div style={{ padding: "0.5rem 1rem 1rem" }}>
+      {isOpen && (
+        <s-stack
+          padding="small"
+          background="base"
+          borderRadius="none none base base"
+          gap="small"
+        >
         {images.length === 0 ? (
           <s-text color="subdued"><em>No images found</em></s-text>
         ) : (
           images.map((img, i) => {
             const alreadyOnCdn = img.src.includes("cdn.shopify.com");
             return (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  gap: "1rem",
-                  alignItems: "flex-start",
-                  marginBottom: "1rem",
-                  padding: "0.8rem",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "6px",
-                  backgroundColor: "#fff",
-                }}
+              <s-stack 
+                padding="base"
+                borderRadius="base"
+                borderWidth="base"
+                gap="base"
               >
-                <img
-                  src={img.src}
-                  alt={img.alt}
-                  style={{ width: 120, height: 80, objectFit: "contain", flexShrink: 0 }}
-                />
+                <s-grid
+                  key={i}
+                  gridTemplateColumns="100px 1fr"
+                  gap="base"
+                  alignItems="center"
+                >
+                  <s-image
+                    src={img.src}
+                    alt={img.alt}
+                    aspectRatio="1/1"
+                    borderRadius="base"
+                  />
 
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <p>
-                    {img.src}
-                  </p>
+                  <s-stack gap="base">
+                    <s-text>
+                      {img.src}
+                    </s-text>
 
-                  <div style={{ marginTop: "0.45rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    {alreadyOnCdn ? (
-                      <span style={{ fontSize: "0.8rem", color: "#2e7d32", fontWeight: 600 }}>
-                        ✓ Already on Shopify CDN
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => importImage(i)}
-                        disabled={isImporting}
-                        style={{
-                          padding: "0.3rem 0.75rem",
-                          cursor: isImporting ? "not-allowed" : "pointer",
-                          opacity: isImporting ? 0.6 : 1,
-                        }}
-                      >
-                        {importingIndex === i && isImporting ? "Importing…" : "Import to Shopify CDN"}
-                      </button>
-                    )}
+                    <s-stack direction="inline" alignItems="center" gap="base">
+                      {alreadyOnCdn ? (
+                        <s-text tone="success">
+                          ✓ Already on Shopify CDN
+                        </s-text>
+                      ) : (
+                        <s-button
+                          onClick={() => importImage(i)}
+                          disabled={isImporting}
+                        >
+                          {importingIndex === i && isImporting ? "Importing…" : "Import to Shopify CDN"}
+                        </s-button>
+                      )}
 
-                    {importErrors[i] && (
-                      <span style={{ color: "red", fontSize: "0.8rem" }}>{importErrors[i]}</span>
-                    )}
-                  </div>
-                </div>
-              </div>
+                      {importErrors[i] && (
+                        <s-text tone="critical">{importErrors[i]}</s-text>
+                      )}
+                    </s-stack>
+                  </s-stack>
+                </s-grid>
+              </s-stack>
             );
           })
         )}
-      </div>
-    </details>
+      </s-stack>
+      )}
+    </s-stack>
   );
 }
 
@@ -1773,14 +1793,12 @@ function extractImagesFromHtml(html?: string | null): ImgInfo[] {
 
 type ArticleImageAltEditorProps = {
   article: ArticleNode;
-  articleNumber: number;
   isArticleOpen: boolean;
   onToggleArticle: () => void;
 };
 
 function ArticleImageAltEditor({
   article,
-  articleNumber,
   isArticleOpen,
   onToggleArticle,
 }: ArticleImageAltEditorProps) {
@@ -1917,6 +1935,7 @@ function ArticleImageAltEditor({
       key={article.id}
       background="base"
       borderRadius="base"
+      borderWidth="base"
     >
       <s-clickable
         id={`article-toggle-${article.id}`}
@@ -1926,19 +1945,16 @@ function ArticleImageAltEditor({
       >
         <s-stack direction="inline" alignItems="center" justifyContent="space-between" inlineSize="100%">
           <s-stack direction="inline" alignItems="center" justifyContent="center" gap="base">
-            <s-text>{articleNumber}.</s-text>
             <s-text>{article.title}</s-text>
             <s-badge>Images missing alt text: { missingAltCount }</s-badge>
           </s-stack>
-          {isArticleOpen ? <s-icon type="caret-up"></s-icon> : <s-icon type="caret-down"></s-icon>}
+          {isArticleOpen ? <s-icon type="caret-up"/> : <s-icon type="caret-down"/>}
         </s-stack>
       </s-clickable>
 
       {isArticleOpen && (
         <s-stack 
           padding="base"
-          borderRadius="base"
-          background="subdued"
           gap="base"
         >
           {article.summary && (
