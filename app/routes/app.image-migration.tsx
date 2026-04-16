@@ -976,6 +976,10 @@ export default function TestingPageSean() {
     useLoaderData<typeof loader>();
 
   const pageBatchFetcher = useFetcher();
+  const [openBlogIds, setOpenBlogIds] = useState<Record<string, boolean>>({});
+  const [openArticleIds, setOpenArticleIds] = useState<
+    Record<string, Record<string, boolean>>
+  >({});
   const [pageBodies, setPageBodies] = useState<Record<string, string>>(() =>
     Object.fromEntries(pages.map((edge) => [edge.node.id, edge.node.body ?? ""]))
   );
@@ -1031,71 +1035,106 @@ export default function TestingPageSean() {
     }));
   }
 
+  function toggleBlog(blogId: string) {
+    setOpenBlogIds((cur) => ({
+      ...cur,
+      [blogId]: !cur[blogId],
+    }));
+  }
+
+  function toggleArticle(blogId: string, articleId: string) {
+    setOpenArticleIds((cur) => ({
+      ...cur,
+      [blogId]: {
+        ...(cur[blogId] ?? {}),
+        [articleId]: !(cur[blogId]?.[articleId]),
+      },
+    }));
+  }
+
   return (
-    <div style={{ padding: "2rem" }}>
-      <h1>Content Overview</h1>
-
+    <s-page heading="Image Migration">
       {/* ── Blogs ── */}
-      <details style={sectionStyle}>
-        <summary style={summaryStyle}>
+      <s-section>
+        <s-heading>
           📝 Blogs ({blogs.length})
-        </summary>
+        </s-heading>
 
-        <div style={{ padding: "1rem 0" }}>
+        <s-stack direction="block" gap="base">
           {blogs.map((blogEdge) => {
             const blog = blogEdge.node;
             const articles = blog.articles?.edges ?? [];
+            const isBlogOpen = openBlogIds[blog.id] ?? false;
+            const openArticles = openArticleIds[blog.id] ?? {};
 
-            return (
-              <details key={blog.id} style={nestedSectionStyle}>
-                <summary style={nestedSummaryStyle}>
-                  {blog.title}{" "}
-                  <span style={badgeStyle}>{articles.length} articles</span>
-                </summary>
+            return (              
+              <s-stack
+                key={blog.id} 
+                id={`blog-toggle-${blog.id}`}
+                background="subdued"
+                borderWidth="base"
+                borderRadius="base"
+              >
+                <s-clickable 
+                  borderRadius="base"
+                  padding="base"
+                  onClick={() => toggleBlog(blog.id)}
+                >
+                  <s-stack
+                    direction="inline"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    inlineSize="100%"
+                  >
+                    <s-stack direction="inline" alignItems="center" gap="base">
+                      <s-text>{blog.title}</s-text>
+                      <s-badge>Handle: {blog.handle}</s-badge>
+                      <s-badge>{articles.length} articles</s-badge>
+                    </s-stack>
+                    {isBlogOpen ? <s-icon type="caret-up"></s-icon> : <s-icon type="caret-down"></s-icon>}
+                  </s-stack>
+                </s-clickable>
 
-                <div style={{ padding: "0.5rem 0 0.5rem 1rem" }}>
-                  <p style={{ margin: "0 0 0.5rem", color: "#555", fontSize: "0.85rem" }}>
-                    Handle: <code>{blog.handle}</code>
-                  </p>
-
+                {isBlogOpen && (
+                <s-stack
+                  padding="small"
+                  background="base"
+                  borderRadius="none none base base"
+                >
                   {articles.map((articleEdge) => {
                     const article = articleEdge.node;
+                    const isArticleOpen = openArticles[article.id] ?? false;
+                    const articleNumber = articles.indexOf(articleEdge) + 1;
+
                     return (
-                      <details key={article.id} style={articleSectionStyle}>
-                        <summary style={nestedSummaryStyle}>
-                          {article.title}
-                        </summary>
-                        <div style={{ padding: "0.75rem 0 0.5rem 1rem" }}>
-                          {article.summary && (
-                            <p style={{ margin: "0 0 0.75rem", color: "#555" }}>
-                              {article.summary}
-                            </p>
-                          )}
-                          <ArticleImageAltEditor article={article} />
-                        </div>
-                      </details>
+                      <ArticleImageAltEditor 
+                        key={article.id}
+                        article={article} 
+                        articleNumber={articleNumber}
+                        isArticleOpen={isArticleOpen}
+                        onToggleArticle={() => toggleArticle(blog.id, article.id)}
+                      />
                     );
                   })}
 
                   {articles.length === 0 && (
                     <p style={{ color: "#999", fontStyle: "italic" }}>No articles</p>
                   )}
-                </div>
-              </details>
+                </s-stack>
+              )}
+              </s-stack>
             );
           })}
 
-          {blogs.length === 0 && (
-            <p style={{ color: "#999", fontStyle: "italic" }}>No blogs found</p>
-          )}
-        </div>
-      </details>
+          {blogs.length === 0 && <s-text>No blogs found</s-text>}
+        </s-stack>
+      </s-section>
 
       {/* ── Metaobjects ── */}
-      <details style={sectionStyle}>
-        <summary style={summaryStyle}>
+      <s-section>
+        <s-heading>
           🗂 Metaobjects ({metaobjectGroups.length} types)
-        </summary>
+        </s-heading>
 
         <div style={{ padding: "1rem 0" }}>
           {metaobjectGroups.map((group) => (
@@ -1106,11 +1145,11 @@ export default function TestingPageSean() {
             <p style={{ color: "#999", fontStyle: "italic" }}>No metaobjects found</p>
           )}
         </div>
-      </details>
+      </s-section>
 
       {/* ── Pages ── */}
-      <details style={sectionStyle}>
-        <summary style={summaryStyle}>
+      <s-section>
+        <s-heading>
           📄 Pages ({pages.length})
           {allImportablePages.length > 0 && (
             <button
@@ -1132,7 +1171,7 @@ export default function TestingPageSean() {
                 : `Import All Page Images (${allImportablePages.reduce((sum, p) => sum + p.images.length, 0)})`}
             </button>
           )}
-        </summary>
+        </s-heading>
 
         {((pageBatchFetcher.data as any)?.errors?.length ?? 0) > 0 && (
           <div style={{ padding: "0.5rem 1rem", color: "red", fontSize: "0.82rem" }}>
@@ -1156,8 +1195,8 @@ export default function TestingPageSean() {
             <p style={{ color: "#999", fontStyle: "italic" }}>No pages found</p>
           )}
         </div>
-      </details>
-    </div>
+      </s-section>
+    </s-page>
   );
 }
 
@@ -1237,10 +1276,10 @@ function MetaobjectGroupView({ group }: { group: MetaobjectGroup }) {
     <details style={nestedSectionStyle}>
       <summary style={nestedSummaryStyle}>
         {group.name}{" "}
-        <span style={badgeStyle}>
+        <s-badge>
           <code style={{ fontSize: "0.78rem" }}>{group.type}</code>
-        </span>{" "}
-        <span style={badgeStyle}>{group.entries.length} entries</span>
+        </s-badge>{" "}
+        <s-badge>{group.entries.length} entries</s-badge>
         {allImportable.length > 0 && (
           <button
             onClick={(e) => { e.preventDefault(); handleImportAll(); }}
@@ -1394,7 +1433,7 @@ function MetaobjectFieldRow({
         <code style={{ fontSize: "0.82rem" }}>{field.key}</code>
       </td>
       <td style={tdStyle}>
-        <span style={typeBadgeStyle}>{field.type}</span>
+        <s-badge>{field.type}</s-badge>
       </td>
       <td style={{ ...tdStyle, wordBreak: "break-all", maxWidth: "320px" }}>
         {currentValue ? (
@@ -1510,11 +1549,11 @@ function PageImageMigrationEditor({
     <details style={nestedSectionStyle}>
       <summary style={nestedSummaryStyle}>
         {page.title}
-        <span style={badgeStyle}>
+        <s-badge>
           <code style={{ fontSize: "0.78rem" }}>{page.handle}</code>
-        </span>
-        <span style={badgeStyle}>{images.length} images</span>
-        <span style={badgeStyle}>{externalCount} external</span>
+        </s-badge>
+        <s-badge>{images.length} images</s-badge>
+        <s-badge>{externalCount} external</s-badge>
       </summary>
 
       <div style={{ padding: "0.5rem 1rem 1rem" }}>
@@ -1544,15 +1583,7 @@ function PageImageMigrationEditor({
                 />
 
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontFamily: "monospace",
-                      fontSize: "0.75rem",
-                      color: "#555",
-                      wordBreak: "break-all",
-                    }}
-                  >
+                  <p>
                     {img.src}
                   </p>
 
@@ -1639,22 +1670,18 @@ const nestedSummaryStyle: React.CSSProperties = {
   gap: "0.5rem",
 };
 
-const badgeStyle: React.CSSProperties = {
-  fontSize: "0.75rem",
-  fontWeight: 400,
-  color: "#6b7280",
-  backgroundColor: "#e5e7eb",
-  padding: "0.1rem 0.5rem",
-  borderRadius: "999px",
+const clickableSummaryInnerStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "0.5rem",
+  width: "100%",
 };
 
-const typeBadgeStyle: React.CSSProperties = {
-  fontSize: "0.78rem",
-  backgroundColor: "#ede9fe",
-  color: "#5b21b6",
-  padding: "0.1rem 0.5rem",
-  borderRadius: "4px",
-  fontFamily: "monospace",
+const toggleIconStyle: React.CSSProperties = {
+  marginLeft: "auto",
+  color: "#6b7280",
+  fontSize: "0.9rem",
+  lineHeight: 1,
 };
 
 const tableStyle: React.CSSProperties = {
@@ -1704,7 +1731,19 @@ function extractImagesFromHtml(html?: string | null): ImgInfo[] {
   }));
 }
 
-function ArticleImageAltEditor({ article }: { article: ArticleNode }) {
+type ArticleImageAltEditorProps = {
+  article: ArticleNode;
+  articleNumber: number;
+  isArticleOpen: boolean;
+  onToggleArticle: () => void;
+};
+
+function ArticleImageAltEditor({
+  article,
+  articleNumber,
+  isArticleOpen,
+  onToggleArticle,
+}: ArticleImageAltEditorProps) {
   const saveFetcher = useFetcher();
   const importFetcher = useFetcher();
 
@@ -1827,10 +1866,37 @@ function ArticleImageAltEditor({ article }: { article: ArticleNode }) {
   const isImporting = importFetcher.state !== "idle";
 
   return (
+    <s-box 
+      key={article.id}
+      background="base"
+      borderRadius="base"
+    >
+      <s-clickable
+        id={`article-toggle-${article.id}`}
+        onClick={onToggleArticle}
+        padding="small"
+        background="base"
+        borderRadius="base"
+      >
+        <s-stack direction="inline" alignItems="center" justifyContent="space-between" inlineSize="100%">
+          <s-stack direction="inline" alignItems="center" justifyContent="center" gap="base">
+            <s-text>{articleNumber}.</s-text>
+            <s-text>{article.title}</s-text>
+            <s-badge>Images missing alt text: { missingAltCount }</s-badge>
+          </s-stack>
+          {isArticleOpen ? <s-icon type="caret-up"></s-icon> : <s-icon type="caret-down"></s-icon>}
+        </s-stack>
+      </s-clickable>
+
+      {isArticleOpen && (
+        <div style={{ padding: "0.75rem 0 0.5rem 1rem" }}>
+          {article.summary && (
+            <p style={{ margin: "0 0 0.75rem", color: "#555" }}>
+              {article.summary}
+            </p>
+          )}
+
     <div style={{ marginTop: "1rem" }}>
-      <p>
-        <strong>Images missing alt text:</strong> {missingAltCount}
-      </p>
 
       {images.map((img, i) => {
         const isSaving = savingIndex === i;
@@ -1921,15 +1987,7 @@ function ArticleImageAltEditor({ article }: { article: ArticleNode }) {
               )}
 
               {/* IMAGE SRC */}
-              <p
-                style={{
-                  fontSize: "0.75rem",
-                  color: "#666",
-                  marginTop: "0.5rem",
-                  wordBreak: "break-all",
-                  fontFamily: "monospace",
-                }}
-              >
+              <p>
                 {img.src}
               </p>
 
@@ -1978,5 +2036,9 @@ function ArticleImageAltEditor({ article }: { article: ArticleNode }) {
         );
       })}
     </div>
+
+    </div>
+                        )}
+                      </s-box>
   );
 }
