@@ -787,7 +787,7 @@ export default function ImportPage() {
     | undefined;
 
   return (
-    <s-page heading="Import Gift Cards ">
+    <s-page heading="Gift Card Import">
       <s-section heading="Existing Gift Cards">
         {giftCards.length === 0 ? (
           <s-text color="subdued">No gift cards found.</s-text>
