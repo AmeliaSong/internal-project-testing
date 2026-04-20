@@ -664,140 +664,130 @@ export default function MetaobjectExport() {
   };
 
   return (
-    <div style={{ padding: "1rem", maxWidth: "700px" }}>
-      <h1>Handle Export</h1>
-      <p>
-        Export separate CSV lists of handles from products, collections, blog posts (with blog handle), and pages.
-      </p>
+    <s-page heading="Metaobject Import and Export">
+      <s-section heading="Handle Export">
+        <s-stack gap="base">
+          <s-text>
+            Export separate CSV lists of handles from products, collections, blog posts (with blog handle), and pages.
+          </s-text>
 
-      <div style={{ display: "grid", gap: "0.5rem", marginTop: "1rem" }}>
-        {EXPORT_OPTIONS.map((option) => (
-          <button
-            key={option.resource}
-            type="button"
-            onClick={() => handleExport(option.resource)}
-            disabled={activeExport !== null}
-          >
-            {activeExport === option.resource ? "Exporting..." : option.label}
-          </button>
-        ))}
-      </div>
+          <s-stack direction="inline" gap="small">
+            {EXPORT_OPTIONS.map((option) => (
+              <s-button
+                key={option.resource}
+                type="button"
+                onClick={() => handleExport(option.resource)}
+                disabled={activeExport !== null}
+              >
+                {activeExport === option.resource ? "Exporting..." : option.label}
+              </s-button>
+            ))}
+          </s-stack>
+        </s-stack>
+      </s-section>
 
-      <div style={{ marginTop: "1.5rem", paddingTop: "1rem", borderTop: "1px solid #ddd" }}>
-        <h2 style={{ marginTop: 0 }}>Metaobject Export</h2>
-        <p>Export all metaobjects to CSV, with an optional column-level export of field values.</p>
+      <s-section heading="Metaobject Export">
+        <s-stack gap="small">
+          <s-text>Export all metaobjects to CSV, with optional import-friendly columns.</s-text>
 
-        <label style={{ display: "block", marginBottom: "0.75rem" }}>
-          <input
-            type="checkbox"
+          <s-checkbox
+            label="Include metaobject field values"
             checked={includeFieldValues}
             onChange={(event) => setIncludeFieldValues(event.currentTarget.checked)}
             disabled={activeExport !== null}
-            style={{ marginRight: "0.5rem" }}
           />
-          Include metaobject field values
-        </label>
 
-        <label style={{ display: "block", marginBottom: "0.75rem" }}>
-          <input
-            type="checkbox"
+          <s-checkbox
+            label={'Include "Command" column (for importing)'}
             checked={includeCommandColumn}
             onChange={(event) => setIncludeCommandColumn(event.currentTarget.checked)}
             disabled={activeExport !== null}
-            style={{ marginRight: "0.5rem" }}
           />
-          Include "Command" column (for importing)
-        </label>
 
-        <button
-          type="button"
-          onClick={() => handleExport("metaobjects", includeFieldValues)}
-          disabled={activeExport !== null}
-        >
-          {activeExport === "metaobjects" ? "Exporting..." : "Export Metaobjects"}
-        </button>
-      </div>
+          <s-button
+            type="button"
+            onClick={() => handleExport("metaobjects", includeFieldValues)}
+            disabled={activeExport !== null}
+          >
+            {activeExport === "metaobjects" ? "Exporting..." : "Export Metaobjects"}
+          </s-button>
+        </s-stack>
+      </s-section>
 
-      <div style={{ marginTop: "1.5rem", paddingTop: "1rem", borderTop: "1px solid #ddd" }}>
-        <h2 style={{ marginTop: 0 }}>Metaobject Import (CSV)</h2>
-        <p style={{ marginBottom: "0.5rem" }}>
-          Required columns: Handle, Definition: Handle, Command, Field, Value.
-        </p>
-        <p style={{ marginTop: 0 }}>
-          Supported Command values: NEW, MERGE, UPDATE, REPLACE, DELETE, IGNORE.
-          Command is required on every row.
-        </p>
+      <s-section heading="Metaobject Import (CSV)">
+        <s-stack gap="small">
+          <s-text>Required columns: Handle, Definition: Handle, Command, Field, Value.</s-text>
+          <s-text>Supported Command values: NEW, MERGE, UPDATE, REPLACE, DELETE, IGNORE. Command is required on every row.</s-text>
 
-        <importFetcher.Form method="post" encType="multipart/form-data" style={{ display: "grid", gap: "0.75rem", maxWidth: "500px" }}>
-          <input type="hidden" name="intent" value={IMPORT_INTENT} />
-          <label style={{ display: "grid", gap: "0.35rem" }}>
-            <span>CSV file</span>
-            <input
-              name="csvFile"
-              type="file"
-              accept=".csv,text/csv"
-              required
-              disabled={importFetcher.state !== "idle" || activeExport !== null}
-            />
-          </label>
-          <button type="submit" disabled={importFetcher.state !== "idle" || activeExport !== null}>
-            {importFetcher.state !== "idle" ? "Importing..." : "Import Metaobjects"}
-          </button>
-        </importFetcher.Form>
+          <importFetcher.Form method="post" encType="multipart/form-data">
+            <s-stack gap="small">
+              <input type="hidden" name="intent" value={IMPORT_INTENT} />
+              <label>
+                <s-stack gap="none">
+                  <s-text>CSV file</s-text>
+                  <input
+                    name="csvFile"
+                    type="file"
+                    accept=".csv,text/csv"
+                    required
+                    disabled={importFetcher.state !== "idle" || activeExport !== null}
+                  />
+                </s-stack>
+              </label>
+              <s-button type="submit" disabled={importFetcher.state !== "idle" || activeExport !== null}>
+                {importFetcher.state !== "idle" ? "Importing..." : "Import Metaobjects"}
+              </s-button>
+            </s-stack>
+          </importFetcher.Form>
 
-        {importFetcher.state !== "idle" ? (
-          <div style={{ marginTop: "0.75rem" }}>
-            <p style={{ marginBottom: "0.4rem" }}>Importing metaobjects. This may take a while.</p>
-            <progress style={{ width: "100%", maxWidth: "500px" }} />
-          </div>
-        ) : null}
+          {importFetcher.state !== "idle" ? (
+            <s-stack gap="none">
+              <s-text>Importing metaobjects. This may take a while.</s-text>
+              <progress style={{ width: "100%" }} />
+            </s-stack>
+          ) : null}
 
-        {importResult?.summary ? (
-          <div style={{ marginTop: "0.9rem" }}>
-            <p style={{ margin: 0 }}>
-              Total metaobjects in CSV: {importResult.summary.totalMetaobjects}
-            </p>
-            <p style={{ margin: "0.25rem 0 0" }}>
-              Updated: {importResult.summary.updatedCount} | Created: {importResult.summary.createdCount} | Failed: {importResult.summary.failedCount}
-            </p>
-          </div>
-        ) : null}
+          {importResult?.summary ? (
+            <s-stack gap="none">
+              <s-text>Total metaobjects in CSV: {importResult.summary.totalMetaobjects}</s-text>
+              <s-text>
+                Updated: {importResult.summary.updatedCount} | Created: {importResult.summary.createdCount} | Failed: {importResult.summary.failedCount}
+              </s-text>
+            </s-stack>
+          ) : null}
 
-        {importResult?.error ? (
-          <p style={{ color: "#b00020", marginTop: "0.75rem" }}>{importResult.error}</p>
-        ) : null}
+          {importResult?.error ? <s-text tone="critical">{importResult.error}</s-text> : null}
 
-        {importResult?.validationErrors && importResult.validationErrors.length > 0 ? (
-          <ul style={{ color: "#b00020", marginTop: "0.5rem", paddingLeft: "1.25rem" }}>
-            {importResult.validationErrors.map((validationError) => (
-              <li key={validationError}>{validationError}</li>
-            ))}
-          </ul>
-        ) : null}
+          {importResult?.validationErrors && importResult.validationErrors.length > 0 ? (
+            <s-stack gap="none">
+              {importResult.validationErrors.map((validationError) => (
+                <s-text key={validationError} tone="critical">
+                  {validationError}
+                </s-text>
+              ))}
+            </s-stack>
+          ) : null}
 
-        {importResult?.success && !importResult.error ? (
-          <p style={{ color: "#0b7a35", marginTop: "0.75rem" }}>
-            Metaobject import completed successfully.
-          </p>
-        ) : null}
+          {importResult?.success && !importResult.error ? (
+            <s-text>Metaobject import completed successfully.</s-text>
+          ) : null}
 
-        {importResult?.errorLogs && importResult.errorLogs.length > 0 ? (
-          <div style={{ marginTop: "0.75rem" }}>
-            <button type="button" onClick={downloadErrorLog}>
+          {importResult?.errorLogs && importResult.errorLogs.length > 0 ? (
+            <s-button type="button" onClick={downloadErrorLog}>
               Download Error Log (CSV)
-            </button>
-          </div>
-        ) : null}
-      </div>
+            </s-button>
+          ) : null}
+        </s-stack>
+      </s-section>
 
       {activeExport ? (
-        <div style={{ marginTop: "1rem" }}>
-          <p>Preparing CSV export. This can take a while for large catalogs.</p>
+        <s-stack gap="none">
+          <s-text>Preparing CSV export. This can take a while for large catalogs.</s-text>
           <progress style={{ width: "100%" }} />
-        </div>
+        </s-stack>
       ) : null}
 
-      {errorMessage ? <p style={{ color: "#b00020", marginTop: "0.75rem" }}>{errorMessage}</p> : null}
-    </div>
+      {errorMessage ? <s-text tone="critical">{errorMessage}</s-text> : null}
+    </s-page>
   );
 }
