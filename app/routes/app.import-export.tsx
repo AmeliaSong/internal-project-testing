@@ -586,6 +586,7 @@ export default function MetaobjectExport() {
   const [activeExport, setActiveExport] = useState<ExportResource | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [includeFieldValues, setIncludeFieldValues] = useState(false);
+  const [includeCommandColumn, setIncludeCommandColumn] = useState(false);
   const importFetcher = useFetcher<MetaobjectImportActionData>();
 
   const importResult = importFetcher.data;
@@ -628,6 +629,9 @@ export default function MetaobjectExport() {
       params.set("resource", resource);
       if (resource === "metaobjects" && includeMetaobjectFieldValues) {
         params.set("includeFieldValues", "1");
+      }
+      if (resource === "metaobjects" && includeCommandColumn) {
+        params.set("includeCommandColumn", "1");
       }
 
       const response = await fetch(`${DOWNLOAD_PATH}${params.toString() ? `?${params.toString()}` : ""}`, {
@@ -692,6 +696,17 @@ export default function MetaobjectExport() {
             style={{ marginRight: "0.5rem" }}
           />
           Include metaobject field values
+        </label>
+
+        <label style={{ display: "block", marginBottom: "0.75rem" }}>
+          <input
+            type="checkbox"
+            checked={includeCommandColumn}
+            onChange={(event) => setIncludeCommandColumn(event.currentTarget.checked)}
+            disabled={activeExport !== null}
+            style={{ marginRight: "0.5rem" }}
+          />
+          Include "Command" column (for importing)
         </label>
 
         <button

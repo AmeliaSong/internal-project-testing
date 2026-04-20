@@ -358,6 +358,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const resourceParam = requestUrl.searchParams.get("resource");
   const resource: ExportResource = isExportResource(resourceParam) ? resourceParam : "metaobjects";
   const includeFieldValues = requestUrl.searchParams.get("includeFieldValues") === "1";
+  const includeCommandColumn = requestUrl.searchParams.get("includeCommandColumn") === "1";
 
   if (resource === "products") {
     const handles = await fetchAllProductHandles(admin);
@@ -434,30 +435,53 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         const fields = entry.fields ?? [];
 
         if (fields.length === 0) {
-          rows.push([entry.handle, definition.type, definition.name, "", ""].map(csvEscape).join(","));
+          rows.push(
+            [
+              entry.handle,
+              definition.type,
+              ...(includeCommandColumn ? ["MERGE"] : []),
+              definition.name,
+              "",
+              "",
+            ]
+              .map(csvEscape)
+              .join(",")
+          );
           continue;
         }
 
         for (const field of fields) {
           rows.push(
-            [entry.handle, definition.type, definition.name, field.key, field.value ?? ""]
+            [
+              entry.handle,
+              definition.type,
+              ...(includeCommandColumn ? ["MERGE"] : []),
+              definition.name,
+              field.key,
+              field.value ?? "",
+            ]
               .map(csvEscape)
               .join(",")
           );
         }
       } else {
-        rows.push([entry.handle, definition.type, definition.name, "", ""].map(csvEscape).join(","));
+        rows.push(
+          [
+            entry.handle,
+            definition.type,
+            ...(includeCommandColumn ? ["MERGE"] : []),
+            definition.name,
+            "",
+            "",
+          ]
+            .map(csvEscape)
+            .join(",")
+        );
       }
     }
   }
 
-  const headerValues = [
-    "Handle",
-    "Definition: Handle",
-    "Definition: Name",
-    "Field",
-    "Value",
-  ];
+  const headerValues = ["Handle", "Definition: Handle", ...(includeCommandColumn ? ["Command"] : []), "Definition: Name", "Field", "Value"];
   const headerRow = headerValues.map(csvEscape).join(",");
 
   const csv = [headerRow, ...rows].join("\n");
