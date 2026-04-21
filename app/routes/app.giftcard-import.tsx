@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
   useLoaderData,
   useFetcher,
@@ -1001,6 +1001,8 @@ export default function ImportPage() {
     useLoaderData<typeof loader>();
   const addGiftCardFetcher = useFetcher();
   const importGiftCardsFetcher = useFetcher();
+  const csvFileInputRef = useRef<HTMLInputElement | null>(null);
+  const previousImportGiftCardsFetcherState = useRef(importGiftCardsFetcher.state);
   const addGiftCardData = addGiftCardFetcher.data as
     | { success?: boolean; error?: string; giftCardCode?: string }
     | undefined;
@@ -1012,6 +1014,18 @@ export default function ImportPage() {
         validationErrors?: string[];
       }
     | undefined;
+
+  useEffect(() => {
+    const importFinished =
+      previousImportGiftCardsFetcherState.current !== "idle" &&
+      importGiftCardsFetcher.state === "idle";
+
+    if (importFinished && csvFileInputRef.current) {
+      csvFileInputRef.current.value = "";
+    }
+
+    previousImportGiftCardsFetcherState.current = importGiftCardsFetcher.state;
+  }, [importGiftCardsFetcher.state]);
 
   return (
     <s-page heading="Gift Card Import">
@@ -1096,6 +1110,7 @@ export default function ImportPage() {
                 <s-stack gap="none">
                   <s-text>CSV file</s-text>
                   <input
+                    ref={csvFileInputRef}
                     name="csvFile"
                     type="file"
                     accept=".csv,text/csv"
