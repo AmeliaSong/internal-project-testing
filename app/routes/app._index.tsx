@@ -10,8 +10,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function Index() {
   return (
-    <s-page heading="App Documentation">
-      <s-section heading="What this app is for">
+    <s-page heading="Homepage">
+      <s-section heading="What Symplify is for">
         <s-stack gap="base">
           <s-paragraph>
             This app helps migrate media content to Shopify CDN, import and create gift cards, and export/import handle and metaobject data using CSV.
