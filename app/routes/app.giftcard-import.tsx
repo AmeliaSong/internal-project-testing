@@ -1115,6 +1115,7 @@ export default function ImportPage() {
                 label={selectedFileName ? `✓ ${selectedFileName}` : "Drag CSV file here or click to upload"}
                 accept=".csv,text/csv"
                 required
+                disabled={importGiftCardsFetcher.state !== "idle"}
               />
               <s-button type="submit" disabled={importGiftCardsFetcher.state !== "idle"}>
                 {importGiftCardsFetcher.state !== "idle" ? "Importing..." : "Import gift cards"}
