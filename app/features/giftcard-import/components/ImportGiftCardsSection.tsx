@@ -5,6 +5,7 @@ export function ImportGiftCardsSection() {
   const importGiftCardsFetcher = useFetcher();
   const dropZoneRef = useRef<any>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const previousImportGiftCardsFetcherState = useRef(importGiftCardsFetcher.state);
 
   const importGiftCardsData = importGiftCardsFetcher.data as
     | {
@@ -28,6 +29,18 @@ export function ImportGiftCardsSection() {
     dropZone.addEventListener("change", handleChange);
     return () => dropZone.removeEventListener("change", handleChange);
   }, []);
+
+  useEffect(() => {
+    const importFinished =
+      previousImportGiftCardsFetcherState.current !== "idle" &&
+      importGiftCardsFetcher.state === "idle";
+
+    if (importFinished && dropZoneRef.current) {
+      dropZoneRef.current.value = "";
+    }
+
+    previousImportGiftCardsFetcherState.current = importGiftCardsFetcher.state;
+  }, [importGiftCardsFetcher.state]);
 
   return (
     <s-section heading="Import Gift Cards (CSV)">
