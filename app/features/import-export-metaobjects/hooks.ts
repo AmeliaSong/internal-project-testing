@@ -1,18 +1,15 @@
-import { useState } from "react";
 import type { ExportResource } from "./types";
 import { DOWNLOAD_PATH } from "./constants";
 import { parseMetaobjectFilename } from "./utils";
 
 interface UseHandleExportOptions {
   onError: (error: string | null) => void;
-  activeExport: ExportResource | null;
   setActiveExport: (resource: ExportResource | null) => void;
   includeCommandColumn?: boolean;
 }
 
 export const useHandleExport = ({
   onError,
-  activeExport,
   setActiveExport,
   includeCommandColumn = false,
 }: UseHandleExportOptions) => {
@@ -46,6 +43,15 @@ export const useHandleExport = ({
       if (!response.ok) {
         const message = await response.text();
         throw new Error(message || "Failed to export metaobjects");
+      }
+
+      const contentType = response.headers.get("Content-Type") ?? "";
+      if (!contentType.toLowerCase().includes("text/csv")) {
+        const responseText = await response.text();
+        throw new Error(
+          `Export failed: expected CSV response but received '${contentType || "unknown"}'. ` +
+            `Preview: ${responseText.slice(0, 120)}`,
+        );
       }
 
       const blob = await response.blob();

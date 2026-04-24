@@ -1,6 +1,6 @@
 import type { HandleExportResource, MetaobjectImportCommand } from "./types";
 
-export const DOWNLOAD_PATH = "/app/metaobject-import-export";
+export const DOWNLOAD_PATH = "/app/metaobject-export-download";
 
 export const REQUIRED_METAOBJECT_IMPORT_HEADERS = [
   "Handle",

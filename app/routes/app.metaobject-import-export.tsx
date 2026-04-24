@@ -10,31 +10,12 @@ import {
   HandleExportSection,
   MetaobjectExportSection,
   MetaobjectImportSection,
-  handleExportLoader,
-  isExportResource,
 } from "../features/import-export-metaobjects";
 import { parseCsvContent } from "app/shared/utils/csvParser";
 import { useState } from "react";
 import { CollapsibleFeatureInfo } from "app/shared";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  // Handle export downloads
-  if (request.method === "GET") {
-    const requestUrl = new URL(request.url);
-    const resourceParam = requestUrl.searchParams.get("resource");
-    
-    // If there's a resource param, this is an export request
-    if (resourceParam) {
-      const { admin } = await authenticate.admin(request);
-      const resource = isExportResource(resourceParam) ? resourceParam : "metaobjects";
-      const includeFieldValues = requestUrl.searchParams.get("includeFieldValues") === "1";
-      const includeCommandColumn = requestUrl.searchParams.get("includeCommandColumn") === "1";
-      
-      return handleExportLoader(admin, resource, includeFieldValues, includeCommandColumn);
-    }
-  }
-  
-  // Normal page load
   await authenticate.admin(request);
   return null;
 };
@@ -100,7 +81,6 @@ export default function MetaobjectImportExportPage() {
 
   const { handleExport } = useHandleExport({
     onError: setErrorMessage,
-    activeExport,
     setActiveExport,
     includeCommandColumn,
   });
