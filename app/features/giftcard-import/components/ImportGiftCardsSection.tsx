@@ -46,7 +46,7 @@ export function ImportGiftCardsSection() {
     <s-section heading="Import Gift Cards (CSV)">
       <s-stack gap="small">
         <s-text color="subdued">
-          Required headers: Gift card code, Initial value, Note
+          Required headers: Gift card code, Initial value, Note. (additional columns will be ignored)
         </s-text>
 
         <importGiftCardsFetcher.Form method="post" encType="multipart/form-data">

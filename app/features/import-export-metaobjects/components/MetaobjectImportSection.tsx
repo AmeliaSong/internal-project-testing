@@ -78,7 +78,7 @@ export function MetaobjectImportSection({
     <s-section heading="Metaobject Import (CSV)">
       <s-stack gap="small">
         <s-text color="subdued">
-          Required columns: Handle, Definition: Handle, Command, Field, Value.
+          Required columns: Handle, Definition: Handle, Command, Field, Value. (additional columns will be ignored)
         </s-text>
         <s-text color="subdued">
           Supported Command values: NEW, MERGE, UPDATE, REPLACE, DELETE, IGNORE. Command is
