@@ -16,6 +16,7 @@ export function MetaobjectImportSection({
   const previousImportFetcherState = useRef(importFetcher.state);
   const dropZoneRef = useRef<any>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [showCommandReference, setShowCommandReference] = useState(false);
 
   const importResult = importFetcher.data;
 
@@ -84,27 +85,41 @@ export function MetaobjectImportSection({
           Supported Command values: NEW, MERGE, UPDATE, REPLACE, DELETE, IGNORE. Command is
           required on every row.
         </s-text>
-        <s-unordered-list>
-          <s-list-item>
-            NEW - Create a new metaobject. Fails if the handle already exists.
-          </s-list-item>
-          <s-list-item>
-            MERGE - Update only the specified fields; existing fields not included in the row
-            remain unchanged.
-          </s-list-item>
-          <s-list-item>
-            UPDATE - Update an existing metaobject; fails if the handle does not exist.
-          </s-list-item>
-          <s-list-item>
-            REPLACE - Fully overwrite the metaobject; unspecified fields may be cleared/reset.
-          </s-list-item>
-          <s-list-item>
-            DELETE - Remove the metaobject with the given handle.
-          </s-list-item>
-          <s-list-item>
-            IGNORE - Skip the row during import.
-          </s-list-item>
-        </s-unordered-list>
+        <s-clickable
+          onClick={() => setShowCommandReference((previous) => !previous)}
+          borderRadius="base"
+          padding="small"
+        >
+          <s-stack direction="inline" alignItems="center" gap="small">
+            <s-text color="subdued">Command reference</s-text>
+            <s-icon type={showCommandReference ? "caret-up" : "caret-down"} />
+          </s-stack>
+        </s-clickable>
+
+        {showCommandReference ? (
+          <s-unordered-list>
+            <s-list-item>
+              NEW - Create a new metaobject. Fails if the handle already exists.
+            </s-list-item>
+            <s-list-item>
+              MERGE - Update only the specified fields; existing fields not included in the row
+              remain unchanged.
+            </s-list-item>
+            <s-list-item>
+              UPDATE - Update an existing metaobject; fails if the handle does not exist.
+            </s-list-item>
+            <s-list-item>
+              REPLACE - Fully overwrite the metaobject; unspecified fields may be
+              cleared/reset.
+            </s-list-item>
+            <s-list-item>
+              DELETE - Remove the metaobject with the given handle.
+            </s-list-item>
+            <s-list-item>
+              IGNORE - Skip the row during import.
+            </s-list-item>
+          </s-unordered-list>
+        ) : null}
 
         <importFetcher.Form method="post" encType="multipart/form-data">
           <s-stack gap="small">
