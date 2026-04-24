@@ -1,2 +1,3 @@
-Handle,definition: handle,Command,Field,Value
-test2,providers,replace,name,Test
+Handle,definition: handle,Command,Field,V,br
+test2,providers,merge,name,Test2
+test2,providers,merge,country,Isreal
